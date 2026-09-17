@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord by Nexora Hub</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- PeerJS for WebSockets & Live Peer-to-Peer Chat -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            discord: {
+              darkest: '#1e1f22',
+              darker: '#2b2d31',
+              dark: '#313338',
+              light: '#383a40',
+              accent: '#5865f2',
+              green: '#23a55a',
+              text: '#dbdee1',
+              muted: '#949ba4'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="h-full bg-discord-dark flex overflow-hidden text-discord-text font-sans antialiased">
+
+  <!-- AUTHENTICATION OVERLAY -->
+  <div id="auth-screen" class="fixed inset-0 z-50 bg-discord-darkest flex items-center justify-center p-4">
+    <div class="bg-discord-darker p-8 rounded-lg shadow-xl w-full max-w-md border border-black/20 text-center">
+      <div class="w-16 h-16 bg-discord-accent rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fa-brands fa-discord text-3xl text-white"></i>
+      </div>
+      <h2 class="text-2xl font-bold text-white mb-1">Discord by Nexora Hub</h2>
+      <p class="text-xs text-discord-muted mb-6">Enter your credentials to join live chat.</p>
+
+      <form id="auth-form" class="space-y-4 text-left">
+        <div>
+          <label class="text-xs font-bold text-discord-muted uppercase">Username</label>
+          <input id="auth-username" type="text" required placeholder="Choose a Username" class="w-full mt-1 p-2.5 rounded bg-discord-darkest border border-black/40 text-white focus:outline-none focus:border-discord-accent text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-discord-muted uppercase">Password</label>
+          <input id="auth-password" type="password" required placeholder="••••••••" class="w-full mt-1 p-2.5 rounded bg-discord-darkest border border-black/40 text-white focus:outline-none focus:border-discord-accent text-sm">
+        </div>
+
+        <button type="submit" class="w-full bg-discord-accent hover:bg-discord-accent/80 text-white font-semibold py-2.5 rounded transition duration-200">
+          Login to Chat
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN DISCORD APP -->
+  <div id="app-screen" class="flex w-full h-full hidden">
+    <!-- 1. SERVERS SIDEBAR -->
+    <aside class="w-[72px] bg-discord-darkest flex flex-col items-center py-3 space-y-2 select-none z-20 shrink-0">
+      <div class="relative group flex items-center justify-center w-full">
+        <div class="absolute left-0 w-1 bg-white rounded-r transition-all duration-200 h-10"></div>
+        <button class="w-12 h-12 rounded-[16px] bg-discord-accent text-white flex items-center justify-center shadow-md">
+          <i class="fa-brands fa-discord text-2xl"></i>
+        </button>
+      </div>
+      <div class="w-8 h-[2px] bg-discord-light rounded my-1"></div>
+      <div class="relative group flex items-center justify-center w-full">
+        <button class="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-discord-darker hover:bg-discord-accent text-white flex items-center justify-center transition-all duration-200">
+          <span class="font-bold text-sm">NH</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 2. CHANNELS SIDEBAR -->
+    <aside class="w-60 bg-discord-darker flex flex-col select-none shrink-0 border-r border-black/10">
+      <header class="h-12 border-b border-black/20 px-4 flex items-center justify-between shadow-sm font-bold text-white">
+        <span class="truncate">Discord by Nexora Hub</span>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-3 space-y-4">
+        <div>
+          <span class="text-xs font-bold text-discord-muted uppercase tracking-wider px-1">Connect Room</span>
+          <div class="mt-2 space-y-2">
+            <input id="room-input" type="text" placeholder="Enter Friend's ID..." class="w-full p-2 text-xs rounded bg-discord-darkest text-white border border-black/30 focus:outline-none focus:border-discord-accent">
+            <button onclick="connectToPeer()" class="w-full bg-discord-green hover:bg-discord-green/80 text-white text-xs font-bold py-1.5 rounded transition">
+              Connect
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-xs font-bold text-discord-muted uppercase tracking-wider px-1">Your Live ID</span>
+          <div onclick="copyMyId()" class="mt-1 p-2 bg-discord-darkest rounded text-xs font-mono text-discord-accent truncate cursor-pointer hover:bg-discord-light/30 transition" id="my-peer-id" title="Click to Copy">
+            Connecting...
+          </div>
+        </div>
+      </div>
+
+      <!-- User Profile Footer -->
+      <footer class="h-14 bg-[#232428] px-2 flex items-center justify-between shrink-0">
+        <div class="flex items-center space-x-2 p-1 rounded flex-1 min-w-0">
+          <div id="user-avatar" class="w-8 h-8 rounded-full bg-discord-accent flex items-center justify-center text-white font-bold text-sm">
+            ?
+          </div>
+          <div class="flex flex-col min-w-0 flex-1">
+            <span id="user-display-name" class="text-xs font-semibold text-white truncate">User</span>
+            <span class="text-[10px] text-discord-green truncate">● Online</span>
+          </div>
+        </div>
+        <button onclick="logout()" class="w-8 h-8 hover:bg-discord-light hover:text-red-400 text-discord-muted rounded flex items-center justify-center" title="Logout">
+          <i class="fa-solid fa-right-from-bracket text-xs"></i>
+        </button>
+      </footer>
+    </aside>
+
+    <!-- 3. MAIN CHAT AREA -->
+    <main class="flex-1 flex flex-col bg-discord-dark min-w-0">
+      <header class="h-12 border-b border-black/20 px-4 flex items-center justify-between shadow-sm shrink-0">
+        <div class="flex items-center space-x-2 min-w-0">
+          <i class="fa-solid fa-hashtag text-discord-muted text-xl"></i>
+          <span class="font-bold text-white truncate">live-chat</span>
+        </div>
+      </header>
+
+      <!-- Chat Feed -->
+      <section id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div id="messages-list" class="space-y-4">
+          <div class="text-xs text-discord-muted italic">System: Logged into Discord by Nexora Hub. Share your Live ID with friends to message each other directly!</div>
+        </div>
+      </section>
+
+      <!-- Message Input -->
+      <footer class="p-4 pt-0 shrink-0">
+        <form id="message-form" class="bg-discord-light rounded-lg px-4 py-2.5 flex items-center space-x-3">
+          <input id="message-input" type="text" placeholder="Message on Discord by Nexora Hub..." class="bg-transparent text-discord-text placeholder-discord-muted focus:outline-none flex-1 text-sm" autocomplete="off">
+          <button type="submit" class="text-discord-accent hover:text-white font-bold text-sm">Send</button>
+        </form>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    let peer = null;
+    let connections = [];
+    let currentUser = "";
+
+    // Auth Form Submit
+    document.getElementById('auth-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('auth-username').value.trim();
+      const password = document.getElementById('auth-password').value.trim();
+
+      if (!username || !password) return;
+
+      // Save user details into localStorage
+      localStorage.setItem('nexora_user', JSON.stringify({ username, password }));
+      loginUser(username);
+    });
+
+    // Auto-login on Page Load if saved
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('nexora_user');
+      if (saved) {
+        const { username } = JSON.parse(saved);
+        loginUser(username);
+      }
+    });
+
+    function loginUser(username) {
+      currentUser = username;
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('app-screen').classList.remove('hidden');
+      document.getElementById('user-display-name').innerText = username;
+      document.getElementById('user-avatar').innerText = username[0].toUpperCase();
+
+      initPeer(username);
+    }
+
+    function logout() {
+      localStorage.removeItem('nexora_user');
+      location.reload();
+    }
+
+    // Initialize WebSockets / PeerJS connection
+    function initPeer(username) {
+      // Create a deterministic unique ID based on username
+      const cleanUsername = username.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const uniqueId = `nexora-${cleanUsername}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      peer = new Peer(uniqueId);
+
+      peer.on('open', (id) => {
+        document.getElementById('my-peer-id').innerText = id;
+      });
+
+      peer.on('connection', (conn) => {
+        setupConnection(conn);
+      });
+    }
+
+    function connectToPeer() {
+      const friendId = document.getElementById('room-input').value.trim();
+      if (!friendId || friendId === peer.id) return;
+
+      const conn = peer.connect(friendId);
+      setupConnection(conn);
+      document.getElementById('room-input').value = '';
+    }
+
+    function setupConnection(conn) {
+      conn.on('open', () => {
+        connections.push(conn);
+        appendSystemMessage(`Connected with a new peer!`);
+      });
+
+      conn.on('data', (data) => {
+        appendMessage(data.sender, data.text);
+      });
+    }
+
+    // Handle Message Form Submission
+    document.getElementById('message-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('message-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      // Render locally
+      appendMessage(currentUser, text);
+
+      // Broadcast to all connected peers
+      connections.forEach(conn => {
+        if (conn.open) {
+          conn.send({ sender: currentUser, text });
+        }
+      });
+
+      input.value = '';
+    });
+
+    function appendMessage(sender, text) {
+      const list = document.getElementById('messages-list');
+      const initial = sender ? sender[0].toUpperCase() : '?';
+      
+      list.innerHTML += `
+        <div class="flex space-x-3 hover:bg-black/5 -mx-4 px-4 py-1 rounded">
+          <div class="w-10 h-10 rounded-full bg-discord-accent flex items-center justify-center text-white font-bold text-sm shrink-0">
+            ${initial}
+          </div>
+          <div>
+            <div class="flex items-baseline space-x-2">
+              <span class="font-semibold text-white text-sm">${sender}</span>
+            </div>
+            <p class="text-discord-text text-sm mt-0.5">${text}</p>
+          </div>
+        </div>
+      `;
+
+      const container = document.getElementById('messages-container');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function appendSystemMessage(text) {
+      const list = document.getElementById('messages-list');
+      list.innerHTML += `<div class="text-xs text-discord-green italic">System: ${text}</div>`;
+    }
+
+    function copyMyId() {
+      const id = document.getElementById('my-peer-id').innerText;
+      navigator.clipboard.writeText(id);
+      alert("Copied your Live ID! Send this to your friend so they can join your chat room.");
+    }
+  </script>
+</body>
+</html>
